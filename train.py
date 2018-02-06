@@ -17,7 +17,6 @@ from torch.nn import functional as F
 import ops
 import plot
 import utils
-import encoders
 import generators
 import discriminators
 from vgg import vgg19, vgg19_bn, VGGextraction
@@ -110,6 +109,8 @@ def train():
         
         _data_hr = next(gen)
         real_data_lr, real_data_hr = utils.scale_data(args, _data_hr)
+        real_data_lr = real_data_lr.cuda(0)
+        real_data_hr = real_data_hr.cuda(0)
         real_data_hr_v = autograd.Variable(real_data_hr)
         real_data_lr_v = autograd.Variable(real_data_lr)
         

@@ -10,20 +10,20 @@ from data import Raise
 from scipy.misc import imsave
 import matplotlib.pyplot as plt
 
-
+DATA_DIR = '../adversarial-toolbox/images/'
 def dataset_iterator(args):
     if args.dataset == 'mnist':
         train_gen, dev_gen, test_gen = Mnist.load(args.batch_size, args.batch_size)
     if args.dataset == 'cifar10':
-        data_dir = '../../../images/cifar-10-batches-py/'
+        data_dir = DATA_DIR+'cifar-10-batches-py/'
         train_gen, dev_gen = Cifar10.load(args.batch_size, data_dir)
         test_gen = None
     if args.dataset == 'imagenet':
-        data_dir = '../../../images/imagenet12/imagenet_val_png/'
+        data_dir = DATA_DIR+'imagenet12/imagenet_val_png/'
         train_gen, dev_gen = Imagenet.load(args.batch_size, data_dir)
         test_gen = None
     if args.dataset == 'raise':
-        data_dir = '../../../images/raise/'
+        data_dir = DATA_DIR+'raise/'
         train_gen, dev_gen = Raise.load(args.batch_size, data_dir)
         test_gen = None
     else:
@@ -35,34 +35,7 @@ def dataset_iterator(args):
 def inf_train_gen(train_gen):
     while True:
         for images, _ in train_gen():
-            # yield images.astype('float32').reshape(BATCH_SIZE, 3, 32, 32).transpose(0, 2, 3, 1)
             yield images
-
-
-def stack_data(args, _data):
-    preprocess = torchvision.transforms.Compose([
-        torchvision.transforms.ToTensor(),
-        torchvision.transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225])]
-        )
-
-    if args.task == 'sr':
-        if args.dataset == 'cifar10':
-            datashape = (3, 32, 32)
-            _data = _data.reshape(args.batch_size, *datashape).transpose(0, 2, 3, 1)
-            real_data = torch.stack([preprocess(item) for item in _data]).cuda()
-
-        if args.dataset == 'imagenet':
-            datashape = (3, 224, 224)
-            _data = _data.reshape(args.batch_size, *datashape).transpose(0, 2, 3, 1)
-            real_data = torch.stack([preprocess(item) for item in _data]).cuda(0)
-
-    else:    
-        if args.dataset == 'mnist':
-            real_data = torch.Tensor(_data).cuda()
-
-    return real_data
 
 
 def scale_data(args, data):
@@ -87,10 +60,8 @@ def scale_data(args, data):
         x = transform(data[i])
         low_res[i] = scale(x)
         high_res[i] = normalize(x)
-    lr = low_res.cuda(0)
-    hr = high_res.cuda(0)
     
-    return lr, hr
+    return low_res, high_res
 
  
 def generate_sr_image(iter, netG, save_path, args, data):
