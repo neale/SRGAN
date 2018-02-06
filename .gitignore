@@ -91,7 +91,6 @@ ENV/
 *.hkl
 *.hdf5
 *.JPEG
-*.png
 *.h5
 
 OSDN/
@@ -104,6 +103,7 @@ figures/
 samples/
 imgs/
 img_images/
+plots/
 
 *.ckpt
 *.sh
@@ -126,8 +126,6 @@ tmp/
 board/
 *.tar
 *.bz2
-*.png
-*.jpg
 *.gz
 *.graph
 *.npy
