@@ -92,6 +92,8 @@ ENV/
 *.hdf5
 *.JPEG
 *.h5
+*.pth
+*.pt
 
 OSDN/
 images/
@@ -129,4 +131,3 @@ board/
 *.gz
 *.graph
 *.npy
-*.pth
