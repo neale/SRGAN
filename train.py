@@ -138,7 +138,7 @@ def train():
             for p in netD.parameters():  # reset requires_grad
                 p.requires_grad = True  # they are set to False below in netG update
             
-            for i in range(5):
+            for i in range(1):
                 _data_hr = next(gen)
                 real_data_lr, real_data_hr = utils.scale_data(args, _data_hr)
                 real_data_lr = real_data_lr.cuda(0)
@@ -183,7 +183,9 @@ def train():
             """
             vgg_real = netL(real_data_hr_v)
             vgg_fake = netL(fake_hr)
-            perceptual_loss = mse_criterion(vgg_fake, vgg_real) * vgg_scale
+            p1_loss = mse_criterion(fake_hr, real_data_hr_v)
+            p2_loss = vgg_scale * mse_criterion(vgg_fake, vgg_real)
+            perceptual_loss =  p1_loss + p2_loss
             # perceptual_loss.backward(one)
             """ Try DCGAN first """
             adv_loss = (-torch.log(netD(fake_hr) + 1e-6)).mean()
