@@ -12,8 +12,8 @@ _iter = [0]
 def tick():
     _iter[0] += 1
 
-def plot(d, name, value):
-    _since_last_flush[d+name][_iter[0]] = value
+def plot(name, value):
+    _since_last_flush[name][_iter[0]] = value
 
 def flush():
     prints = []
