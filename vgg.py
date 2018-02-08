@@ -10,7 +10,7 @@ model_urls = {
     'vgg19': 'https://download.pytorch.org/models/vgg19-dcbb9e9d.pth',
     'vgg19_bn': 'https://download.pytorch.org/models/vgg19_bn-c79401a0.pth',
 }
-
+"""
 class VGGextraction(nn.Module):
 
     def __init__(self, model):
@@ -20,6 +20,17 @@ class VGGextraction(nn.Module):
     def forward(self, x):
         x = self.conv54(x)
         return x
+"""
+class VGGextraction(nn.Module):
+
+    def __init__(self, model, layer=11):
+        super(VGGextraction, self).__init__()
+        self.conv54 = nn.Sequential(*list(model.features.children())[:(layer+1)])
+
+    def forward(self, x):
+        x = self.conv54(x)
+        return x
+
 
 class VGG(nn.Module):
 

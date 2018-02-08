@@ -8,7 +8,7 @@ from scipy.misc import imshow
 import torch
 import torchvision
 import torchvision.transforms as transforms
-import  torchvision.models as models
+import torchvision.models as models
 from torch import nn
 from torch import autograd
 from torch import optim
@@ -21,12 +21,7 @@ import generators
 import discriminators
 from vgg import vgg19, vgg19_bn, VGGextraction
 
-#TODO
-""" 
-Still need to get vgg19 perceptural loss working, 
-Have vgg19_bn, and vgg19, but I need to grab the features from the last layer
-vgg - conv5/4
-"""
+
 def load_args():
 
     parser = argparse.ArgumentParser(description='recover-gan')
@@ -39,7 +34,8 @@ def load_args():
     parser.add_argument('--dim', default=64)
     parser.add_argument('--dataset', default='mnist')
     parser.add_argument('--batchnorm', default=True)
-    parser.add_argument('--gen_resume', default=None)
+    parser.add_argument('--resumeG', default=False)
+    parser.add_argument('--resumeD', default=False)
     args = parser.parse_args()
     return args
 
@@ -65,7 +61,7 @@ def load_models(args):
     elif args.dataset == 'raise':
         netG = generators.SRResNet(args, shape).cuda(0)
         netD = discriminators.SRdiscriminator(args, shape).cuda(0)
-        vgg = vgg19_bn(pretrained=True).cuda(1)
+        vgg = models.vgg19(pretrained=True).cuda(1)
         netL = VGGextraction(vgg).cuda(1)
 
     print (netG, netD, netL)
@@ -74,6 +70,7 @@ def load_models(args):
 
 def train():
     args = load_args()
+    np.set_printoptions(precision=4)
     train_gen, dev_gen, test_gen = utils.dataset_iterator(args)
     torch.manual_seed(1)
     netG, netD, netL = load_models(args)
@@ -88,14 +85,16 @@ def train():
 
     gen = utils.inf_train_gen(train_gen)
 
-    """ Attempt to resume generator from checkpoint """
-    if args.gen_resume is not None:
-        print ("loading ", args.gen_resume)
-        state = torch.load(args.gen_resume)
-        netG.load_state_dict(state)
-
+   
     """ Pretrain SRResNet with MSE only """
     if args.task == 'SRResNet':
+        
+        """ Attempt to resume generator from checkpoint """
+        if args.resume:
+            print ("loading ", args.resume)
+            state = torch.load(args.resume)
+            netG.load_state_dict(state)
+
         for iteration in range(1, args.epochs):
             start_time = time.time()
             
@@ -127,11 +126,21 @@ def train():
                 torch.save(netG.state_dict(), './SRResNet_PL.pt')
 
     elif args.task == 'SRGAN':
-        """ reduce generator learning rate """
-        for param in optimizerG.param_groups:
-            param['lr'] *= 0.10
+        """ Attempt to resume generator from checkpoint """
+        if args.resumeD:
+            print ("loading generator")
+            state = torch.load('./SRGAN_D.pt')
+            netD.load_state_dict(state)
+        if args.resumeG:
+            print ("loading discriminator")
+            state = torch.load('./SRResNet.pt')
+            netG.load_state_dict(state)
 
+        for p in netL.parameters():  # reset requires_grad
+            p.requires_grad = False  # they are set to False below in netG update
+        
         """ train SRGAN """
+
         for iteration in range(1, args.epochs):
             start_time = time.time()
             """ Update D network """
@@ -181,11 +190,23 @@ def train():
             real_data_lr_v = autograd.Variable(real_data_lr)
             fake_hr = netG(real_data_lr_v)
             """
-            vgg_real = netL(real_data_hr_v)
-            vgg_fake = netL(fake_hr)
-            p1_loss = mse_criterion(fake_hr, real_data_hr_v)
+            real_gpu1 = autograd.Variable(real_data_hr.cuda(1), requires_grad=False)
+            fake_gpu1 = autograd.Variable(fake_hr.cpu().data.cuda(1), requires_grad=False)
+
+            vgg_real = netL(real_gpu1)
+            vgg_fake = netL(fake_gpu1)
+            # p1_loss = mse_criterion(fake_gpu1, real_gpu1)
             p2_loss = vgg_scale * mse_criterion(vgg_fake, vgg_real)
-            perceptual_loss =  p1_loss + p2_loss
+            """
+            test_loss = vgg_scale * ((vgg_fake - vgg_real).pow(2).sum(3).mean())
+            if (iteration % 20) == 0:
+                print ("test: ", test_loss.cpu().data.numpy()[0])
+                print ("mse: ", p2_loss.cpu().data.numpy()[0])
+            """
+            #print ("mse loss: ", p1_loss.cpu().data.numpy())
+            #print ("vgg loss: ", p2_loss.cpu().data.numpy())
+            # perceptual_loss =  (p1_loss + p2_loss).cuda(0)
+            perceptual_loss = p2_loss.cuda(0)
             # perceptual_loss.backward(one)
             """ Try DCGAN first """
             adv_loss = (-torch.log(netD(fake_hr) + 1e-6)).mean()
@@ -199,31 +220,26 @@ def train():
             optimizerG.step()
 
             psnr = ops.psnr(args, perceptual_loss)
-
-            save_dir = './plots/'+args.dataset
-            plot.plot('vgg loss', perceptual_loss.cpu().data.numpy())
-            plot.plot('psnr', np.array(psnr))
-            plot.plot('disc cost', D_cost.cpu().data.numpy())
-            plot.plot('gen cost', adv_loss.cpu().data.numpy())
-            #plot.plot('w1 distance', Wasserstein_D.cpu().data.numpy())
-
-            # Calculate dev loss and generate samples every 100 iters
-            if iteration % 20 == 19:
-                dev_disc_costs = []
-                for images, _ in dev_gen():
-                    _, imgs = utils.scale_data(args, images) 
-                    imgs = imgs.cuda(0)
-                    imgs_v = autograd.Variable(imgs, volatile=True)
-                    D = netD(imgs_v)
-                    _dev_disc_cost = -D.mean().cpu().data.numpy()
-                    dev_disc_costs.append(_dev_disc_cost)
-                plot.plot('dev disc cost', np.mean(dev_disc_costs))
+            if iteration % 100 == 0:
+                save_dir = './plots/'+args.dataset
+                content_loss = np.around(float(perceptual_loss.cpu().data.numpy()[0]), 5)
+                adversarial_loss = np.around(float(adv_loss.cpu().data.numpy()[0]), 5)
+                disc_cost = np.around(float(D_cost.cpu().data.numpy()[0]), 5)
+                psnr = np.around(float(np.array(psnr)), 5)
+                print("iter {}\tcontent loss: {}\tadv loss: {}\tdisc cost: {}\tpsnr: {}"
+                        .format(iteration, content_loss, adversarial_loss, disc_cost, psnr)
+                )
                 data = (real_data_lr, real_data_hr, fake_hr)
                 utils.generate_sr_image(iteration, netG, save_dir, args, data)
-            # Save logs every 100 iters 
+            """
+            #plot.plot('w1 distance', Wasserstein_D.cpu().data.numpy())
             if (iteration < 5) or (iteration % 20 == 19):
                 plot.flush()
+            """
             plot.tick()
+            if (iteration % 5000) == 0:
+                torch.save(netD.state_dict(), 'SRGAN_D.pt')
+                torch.save(netG.state_dict(), 'SRGAN_G.pt')
 
 if __name__ == '__main__':
     train()

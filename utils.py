@@ -24,7 +24,8 @@ def dataset_iterator(args):
         test_gen = None
     if args.dataset == 'raise':
         data_dir = DATA_DIR+'raise/'
-        train_gen, dev_gen = Raise.load(args.batch_size, data_dir)
+        train_gen = Raise.load(args.batch_size, data_dir)
+        dev_gen = train_gen
         test_gen = None
     else:
         raise ValueError
