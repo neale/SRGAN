@@ -23,7 +23,7 @@ class VGGextraction(nn.Module):
 """
 class VGGextraction(nn.Module):
 
-    def __init__(self, model, layer=11):
+    def __init__(self, model, layer=35):
         super(VGGextraction, self).__init__()
         self.conv54 = nn.Sequential(*list(model.features.children())[:(layer+1)])
 

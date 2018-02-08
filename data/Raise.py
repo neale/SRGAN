@@ -37,7 +37,7 @@ def raise_generator(filenames, batch_size, data_dir):
 
 def load(batch_size, data_dir=data_dir):
     dir_hr = data_dir+'RAISE_HR/'
-    filelist_hr = glob.glob(dir_hr+'*.png')[:1000]
+    filelist_hr = glob.glob(dir_hr+'*.png')
 
     return (
         raise_generator(filelist_hr, batch_size, data_dir)

@@ -75,8 +75,8 @@ def train():
     torch.manual_seed(1)
     netG, netD, netL = load_models(args)
 
-    optimizerG = optim.Adam(netG.parameters(), lr=0.0001, betas=(0.5, 0.9))
-    optimizerD = optim.Adam(netD.parameters(), lr=1e-4, betas=(0.5, 0.9))
+    optimizerG = optim.Adam(netG.parameters(), lr=10e-4, betas=(0.9))
+    optimizerD = optim.Adam(netD.parameters(), lr=10e-4, betas=(0.9))
     vgg_scale = 0.006  # scales perceptual loss to be on order of MSE loss
     loss_ratio = 0.001 # balancing ratio on content vs GAN
     mse_criterion = nn.MSELoss()
@@ -90,12 +90,12 @@ def train():
     if args.task == 'SRResNet':
         
         """ Attempt to resume generator from checkpoint """
-        if args.resume:
-            print ("loading ", args.resume)
-            state = torch.load(args.resume)
+        if args.resumeG is True:
+            print ("loading generator from weights")
+            state = torch.load('./SRResNet.pt')
             netG.load_state_dict(state)
 
-        for iteration in range(1, args.epochs):
+        for iteration in range(1, 1000000):
             start_time = time.time()
             
             _data_hr = next(gen)
@@ -122,8 +122,8 @@ def train():
             if (iteration < 5) or (iteration % 20 == 19):
                 plot.flush()
             plot.tick()
-            if iteration % 5000 == 0:
-                torch.save(netG.state_dict(), './SRResNet_PL.pt')
+            if iteration % 100000 == 0:
+                torch.save(netG.state_dict(), './SRResNet_{}.pt'.format(iterations))
 
     elif args.task == 'SRGAN':
         """ Attempt to resume generator from checkpoint """
@@ -197,7 +197,7 @@ def train():
             vgg_fake = netL(fake_gpu1)
             # p1_loss = mse_criterion(fake_gpu1, real_gpu1)
             p2_loss = vgg_scale * mse_criterion(vgg_fake, vgg_real)
-            """
+            """ 
             test_loss = vgg_scale * ((vgg_fake - vgg_real).pow(2).sum(3).mean())
             if (iteration % 20) == 0:
                 print ("test: ", test_loss.cpu().data.numpy()[0])
