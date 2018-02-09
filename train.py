@@ -12,6 +12,7 @@ import torchvision.models as models
 from torch import nn
 from torch import autograd
 from torch import optim
+from torch.optim.lr_scheduler import StepLR
 from torch.nn import functional as F
 
 import ops
@@ -75,8 +76,9 @@ def train():
     torch.manual_seed(1)
     netG, netD, netL = load_models(args)
 
-    optimizerG = optim.Adam(netG.parameters(), lr=10e-4, betas=(0.9))
-    optimizerD = optim.Adam(netD.parameters(), lr=10e-4, betas=(0.9))
+    optimizerG = optim.Adam(netG.parameters(), lr=10e-5)
+    optimizerD = optim.Adam(netD.parameters(), lr=10e-4)
+    scheduler = StepLR(optimizerG, step_size=500000, gamma=0.1)
     vgg_scale = 0.006  # scales perceptual loss to be on order of MSE loss
     loss_ratio = 0.001 # balancing ratio on content vs GAN
     mse_criterion = nn.MSELoss()
@@ -95,9 +97,9 @@ def train():
             state = torch.load('./SRResNet.pt')
             netG.load_state_dict(state)
 
-        for iteration in range(1, 1000000):
+        for iter in range(1, 1000000):
             start_time = time.time()
-            
+            scheduler.step()
             _data_hr = next(gen)
             real_data_lr, real_data_hr = utils.scale_data(args, _data_hr)
             real_data_lr = real_data_lr.cuda(0)
@@ -109,6 +111,14 @@ def train():
 
             netG.zero_grad()
             content_loss = mse_criterion(fake_hr, real_data_hr_v)
+            """ 
+            # something is weird here
+            if (iter > 1000) and (content_loss.cpu().data.numpy()[0] > .4):
+                print("\nweird thing happened, check for saved logs\n")
+                np.save("weird_fake.npy", fake_hr.cpu().data.numpy())
+                np.save("weird_real.npy", real_data_hr_v.cpu().data.numpy())
+                continue
+            """
             psnr = ops.psnr(args, content_loss)
             content_loss.backward()
             optimizerG.step()
@@ -117,13 +127,13 @@ def train():
             plot.plot('content_loss_(mse)', content_loss.data.cpu().numpy())
             plot.plot('psnr', np.array(psnr))
             data = (real_data_lr, real_data_hr, fake_hr)
-            if iteration % 20 == 19:
-                utils.generate_sr_image(iteration, netG, save_dir, args, data)
-            if (iteration < 5) or (iteration % 20 == 19):
+            if iter % 100 == 99:
+                utils.generate_sr_image(iter, netG, save_dir, args, data)
+            if (iter < 5) or (iter % 100 == 99):
                 plot.flush()
             plot.tick()
-            if iteration % 100000 == 0:
-                torch.save(netG.state_dict(), './SRResNet_{}.pt'.format(iterations))
+            if iter % 100000 == 0:
+                torch.save(netG.state_dict(), './SRResNet_{}.pt'.format(iter))
 
     elif args.task == 'SRGAN':
         """ Attempt to resume generator from checkpoint """

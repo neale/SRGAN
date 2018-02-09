@@ -73,7 +73,12 @@ def generate_sr_image(iter, netG, save_path, args, data):
     lr = lr.cpu().numpy().transpose(0, 2, 3, 1)[..., ::-1]
     hr = hr.cpu().numpy().transpose(0, 2, 3, 1)[..., ::-1]
     sr = sr.cpu().data.numpy().transpose(0, 2, 3, 1)[..., ::-1]
-    show_sr(lr[0], hr[0], sr[0])
+    lr = (lr - np.min(lr))/(np.max(lr) - np.min(lr))
+    hr = (hr - np.min(hr))/(np.max(hr) - np.min(hr))
+    sr = ((sr+2)/2*127.5).astype(np.uint8)
+    #print ("SR: ", np.max(sr), np.min(sr), sr.shape)
+    save_name = save_path+'/SRGAN_iter_{}'.format(iter)
+    show_sr(lr[0], hr[0], sr[0], save_name)
 
 
 def generate_image(iter, model, save_path, args):
@@ -94,10 +99,10 @@ def generate_image(iter, model, save_path, args):
     save_images(samples, save_path+'/samples_{}.jpg'.format(iter))
 
 
-def show_sr(lr, hr, sr):
-    lr = (lr - np.min(lr))/(np.max(lr) - np.min(lr))
-    hr = (hr - np.min(hr))/(np.max(hr) - np.min(hr))
-    sr = ((sr+2)/2*127.5).astype(np.uint8)
+def show_sr(lr, hr, sr, name):
+    #lr = (lr - np.min(lr))/(np.max(lr) - np.min(lr))
+    #hr = (hr - np.min(hr))/(np.max(hr) - np.min(hr))
+    #sr = ((sr+2)/2*127.5).astype(np.uint8)
     #print ("SR: ", np.max(sr), np.min(sr), sr.shape)
     #print ("LR: ", np.max(lr), np.min(lr), lr.shape)
     #print ("HR: ", np.max(hr), np.min(hr), hr.shape)
@@ -114,6 +119,7 @@ def show_sr(lr, hr, sr):
     plt.axis('off')
     plt.draw()
     plt.pause(0.001)
+    plt.savefig(name, format='png')
 
 
 def save_images(X, save_path, use_np=False):
